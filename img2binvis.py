@@ -1,3 +1,4 @@
+import math
 import os
 import random
 
@@ -70,10 +71,17 @@ def random_color_img(x: int, y: int = -1):
     return img
 
 
-def point(hilbert_curve: HilbertCurve, dis: int):
+def dis2point(hilbert_curve: HilbertCurve, dis: int):
     x, y = hilbert_curve.point_from_distance(dis % (hilbert_curve.max_h + 1))
-    x += dis // (hilbert_curve.max_h + 1) * (hilbert_curve.max_x + 1)
+    x += (dis // (hilbert_curve.max_h + 1)) * (hilbert_curve.max_x + 1)
     return x, y
+
+
+def point2dis(hilbert_curve: HilbertCurve, x: int, y: int):
+    x_mod = x % (hilbert_curve.max_x + 1)
+    dis = hilbert_curve.distance_from_point([x_mod, y])
+    dis += (x // (hilbert_curve.max_x + 1)) * (hilbert_curve.max_h + 1)
+    return dis
 
 
 def img_to_binary(
@@ -88,45 +96,47 @@ def img_to_binary(
     # use the hilbert curve to traverse the original image
     hilbert_curve = HilbertCurve(curves[size], 2)
 
-    flag = False
     for i in range(img2.shape[0]):
         for j in range(img2.shape[1]):
-            if ori_data is not None and i * size + j == ori_data.shape[0]:
-                flag = True
-                break
-            x, y = point(hilbert_curve, i * size + j)
+            x, y = dis2point(hilbert_curve, i * size + j)
             img2[i, j] = img[x, y]
-        if flag:
-            break
+
+    if ori_data is not None:
+        filesize = ori_data.shape[0]
+        ratio = size * size * 4 / filesize
+    else:
+        filesize = None
+        ratio = None
 
     with open(filename, "wb") as f:
         for i in range(img2.shape[0]):
             for j in range(img2.shape[1]):
-                if ori_data is not None and i * size + j == ori_data.shape[0]:
-                    return
                 for k in range(len(colors)):
                     if (img2[i, j] == colors[k]).all():
-                        if ori_data is not None and (
-                            colors[k] == bin2color(ori_data[i * size + j])
-                        ):
-                            f.write(int(ori_data[i * size + j]).to_bytes(1, "big"))
-                        else:
+                        if ori_data is None:
                             f.write(color_codes[k]().to_bytes(1, "big"))
+                        else:
+                            dis = point2dis(hilbert_curve, i, j)
+                            idx = math.floor(dis / ratio)
+                            if idx == i * size + j or colors[k] != bin2color(
+                                int(ori_data[idx])
+                            ):
+                                f.write(color_codes[k]().to_bytes(1, "big"))
+                            else:
+                                f.write(int(ori_data[idx]).to_bytes(1, "big"))
                         break
 
 
 def binary_to_img(data: npt.NDArray[np.uint8], size: int):
     hilbert_curve = HilbertCurve(curves[size], 2)
     filesize = data.shape[0]
-    if filesize % size == 0:
-        height = filesize // size
-    else:
-        height = filesize // size + size
-    img = np.zeros((height, size, 3), np.uint8)
-
-    for i, byte in enumerate(data):
-        x, y = point(hilbert_curve, i)
-        img[x, y] = bin2color(int.from_bytes(byte, "big"))
+    ratio = size * size * 4 / filesize
+    img = np.zeros((size * 4, size, 3), np.uint8)
+    for i in range(size * 4):
+        for j in range(size):
+            dis = point2dis(hilbert_curve, i, j)
+            idx = math.floor(dis / ratio)
+            img[i, j] = bin2color(int(data[idx]))
     return img
 
 
@@ -148,10 +158,10 @@ if __name__ == "__main__":
     # cv.waitKey(0)
     # img = cv.imread("random_color_square_img.png")
     # img_to_binary(img, "binary.bin", 128)
-    # img, data = binary_to_img(".cph/main.bin", 256)
-    # cv.imwrite("reconstructed.png", img)
-    # cv.imshow("image", img)
-    # cv.waitKey(0)
     data = get_binary(".cph/main.bin")
+    img = binary_to_img(data, 256)
+    cv.imwrite("reconstructed.png", img)
+    cv.imshow("image", img)
+    cv.waitKey(0)
     img = cv.imread("reconstructed.png")
-    img_to_binary(img, "binaryreq.bin", 256, data) # type: ignore
+    img_to_binary(img, "binaryreq.bin", 256, data)  # type: ignore
