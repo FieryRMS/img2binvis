@@ -3,6 +3,7 @@ import random
 
 import cv2 as cv
 import numpy as np
+import numpy.typing as npt
 from hilbertcurve.hilbertcurve import HilbertCurve  # type: ignore
 
 
@@ -75,51 +76,69 @@ def point(hilbert_curve: HilbertCurve, dis: int):
     return x, y
 
 
-def img_to_binary(img: np.ndarray, filename: str, size: int, ori_data: np.ndarray | None = None):  # type: ignore
+def img_to_binary(
+    img: npt.NDArray[np.uint8],
+    filename: str,
+    size: int,
+    ori_data: npt.NDArray[np.uint8] | None = None,
+):
     # make a new image with the same size as the original image
     img2 = np.zeros_like(img)  # type: ignore
 
     # use the hilbert curve to traverse the original image
     hilbert_curve = HilbertCurve(curves[size], 2)
 
+    flag = False
     for i in range(img2.shape[0]):
         for j in range(img2.shape[1]):
-            x, y = point(hilbert_curve, i * img2.shape[1] + j)
+            if ori_data is not None and i * size + j == ori_data.shape[0]:
+                flag = True
+                break
+            x, y = point(hilbert_curve, i * size + j)
             img2[i, j] = img[x, y]
+        if flag:
+            break
 
     with open(filename, "wb") as f:
         for i in range(img2.shape[0]):
             for j in range(img2.shape[1]):
+                if ori_data is not None and i * size + j == ori_data.shape[0]:
+                    return
                 for k in range(len(colors)):
                     if (img2[i, j] == colors[k]).all():
                         if ori_data is not None and (
-                            colors[k] == bin2color(ori_data[i, j])
+                            colors[k] == bin2color(ori_data[i * size + j])
                         ):
-                            f.write(int(ori_data[i, j]).to_bytes(1, "big"))
+                            f.write(int(ori_data[i * size + j]).to_bytes(1, "big"))
                         else:
                             f.write(color_codes[k]().to_bytes(1, "big"))
                         break
 
 
-def binary_to_img(filepath: str, size: int):
+def binary_to_img(data: npt.NDArray[np.uint8], size: int):
     hilbert_curve = HilbertCurve(curves[size], 2)
-    filesize = os.path.getsize(filepath)
+    filesize = data.shape[0]
     if filesize % size == 0:
         height = filesize // size
     else:
         height = filesize // size + size
-    print(height)
     img = np.zeros((height, size, 3), np.uint8)
-    data = np.zeros((height, size), np.uint8)
 
+    for i, byte in enumerate(data):
+        x, y = point(hilbert_curve, i)
+        img[x, y] = bin2color(int.from_bytes(byte, "big"))
+    return img
+
+
+def get_binary(filepath: str):
+    filesize = os.path.getsize(filepath)
+    data = np.zeros((filesize), np.uint8)
     with open(filepath, "rb") as f:
         distance = 0
         while byte := f.read(1):
-            x, y = point(hilbert_curve, distance)
-            img[x, y] = bin2color(int.from_bytes(byte, "big"))
-            data[distance // size, distance % size] = int.from_bytes(byte, "big")
+            data[distance] = int.from_bytes(byte, "big")
             distance += 1
-    return img, data
+    return data
 
 
 if __name__ == "__main__":
@@ -128,12 +147,11 @@ if __name__ == "__main__":
     # cv.imshow("image", img)
     # cv.waitKey(0)
     # img = cv.imread("random_color_square_img.png")
+    # img_to_binary(img, "binary.bin", 128)
+    # img, data = binary_to_img(".cph/main.bin", 256)
+    # cv.imwrite("reconstructed.png", img)
     # cv.imshow("image", img)
     # cv.waitKey(0)
-    # img_to_binary(img, "binary.bin", 128)
-    img, data = binary_to_img("binary.bin", 128)
-    cv.imwrite("reconstructed.png", img)
-    cv.imshow("image", img)
-    cv.waitKey(0)
+    data = get_binary(".cph/main.bin")
     img = cv.imread("reconstructed.png")
-    img_to_binary(img, "binaryreq.bin", 128, data)
+    img_to_binary(img, "binaryreq.bin", 256, data) # type: ignore
