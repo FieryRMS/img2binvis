@@ -1,3 +1,4 @@
+import os
 import random
 
 import cv2 as cv
@@ -10,15 +11,22 @@ def black():
 
 
 def green():
-    return random.randint(1, 31)
+    res = random.randint(1, 31)
+    while res in [9, 10, 13]:
+        res = random.randint(1, 31)
+    return res
 
 
 def blue():
-    return random.randint(32, 127)
+    res = random.randint(32 - 3, 126)
+    if res < 32:
+        res = 31 - res
+        return [9, 10, 13][res]
+    return res
 
 
 def red():
-    return random.randint(128, 255)
+    return random.randint(127, 254)
 
 
 def white():
@@ -27,8 +35,23 @@ def white():
 
 color_codes = [black, green, blue, red, white]
 
+
 colors = [(0, 0, 0), (77, 175, 74), (16, 114, 184), (228, 26, 28), (255, 255, 255)]
 curves = {2: 1, 4: 2, 8: 3, 16: 4, 32: 5, 64: 6, 128: 7, 256: 8}
+
+
+def bin2color(bin: int):
+    if bin == 0:
+        return colors[0]
+    if bin in [9, 10, 13]:
+        return colors[2]
+    if bin >= 1 and bin <= 31:
+        return colors[1]
+    if bin >= 32 and bin <= 126:
+        return colors[2]
+    if bin >= 127 and bin <= 254:
+        return colors[3]
+    return colors[4]
 
 
 for i in range(len(colors)):
@@ -52,36 +75,65 @@ def point(hilbert_curve: HilbertCurve, dis: int):
     return x, y
 
 
-def img_to_binary(img: np.ndarray, size: int):  # type: ignore
+def img_to_binary(img: np.ndarray, filename: str, size: int, ori_data: np.ndarray | None = None):  # type: ignore
     # make a new image with the same size as the original image
-    img2 = np.zeros((img.shape[0], img.shape[1], 3), np.uint8)
+    img2 = np.zeros_like(img)  # type: ignore
 
     # use the hilbert curve to traverse the original image
     hilbert_curve = HilbertCurve(curves[size], 2)
-    print(hilbert_curve.max_h, hilbert_curve.max_x)
 
     for i in range(img2.shape[0]):
         for j in range(img2.shape[1]):
             x, y = point(hilbert_curve, i * img2.shape[1] + j)
-
-            # print(x, y)
             img2[i, j] = img[x, y]
 
-    with open("binary.bin", "wb") as f:
+    with open(filename, "wb") as f:
         for i in range(img2.shape[0]):
             for j in range(img2.shape[1]):
                 for k in range(len(colors)):
                     if (img2[i, j] == colors[k]).all():
-                        f.write(color_codes[k]().to_bytes(1, "big"))
+                        if ori_data is not None and (
+                            colors[k] == bin2color(ori_data[i, j])
+                        ):
+                            f.write(int(ori_data[i, j]).to_bytes(1, "big"))
+                        else:
+                            f.write(color_codes[k]().to_bytes(1, "big"))
                         break
 
 
+def binary_to_img(filepath: str, size: int):
+    hilbert_curve = HilbertCurve(curves[size], 2)
+    filesize = os.path.getsize(filepath)
+    if filesize % size == 0:
+        height = filesize // size
+    else:
+        height = filesize // size + size
+    print(height)
+    img = np.zeros((height, size, 3), np.uint8)
+    data = np.zeros((height, size), np.uint8)
+
+    with open(filepath, "rb") as f:
+        distance = 0
+        while byte := f.read(1):
+            x, y = point(hilbert_curve, distance)
+            img[x, y] = bin2color(int.from_bytes(byte, "big"))
+            data[distance // size, distance % size] = int.from_bytes(byte, "big")
+            distance += 1
+    return img, data
+
+
 if __name__ == "__main__":
-    img = random_color_img(512, 128)
-    cv.imwrite("random_color_square_img.png", img)
+    # img = random_color_img(512, 128)
+    # # cv.imwrite("random_color_square_img.png", img)
+    # cv.imshow("image", img)
+    # cv.waitKey(0)
+    # img = cv.imread("random_color_square_img.png")
+    # cv.imshow("image", img)
+    # cv.waitKey(0)
+    # img_to_binary(img, "binary.bin", 128)
+    img, data = binary_to_img("binary.bin", 128)
+    cv.imwrite("reconstructed.png", img)
     cv.imshow("image", img)
     cv.waitKey(0)
-    img = cv.imread("random_color_square_img.png")
-    cv.imshow("image", img)
-    cv.waitKey(0)
-    img_to_binary(img, 128)
+    img = cv.imread("reconstructed.png")
+    img_to_binary(img, "binaryreq.bin", 128, data)
