@@ -94,7 +94,7 @@ def img_to_binary(
     ori_data: npt.NDArray[np.uint8],
 ):
     # make a new image with the same size as the original image
-    img2 = np.zeros_like(img)  # type: ignore
+    img2 = np.zeros_like(img)
 
     # use the hilbert curve to traverse the original image
     hilbert_curve = HilbertCurve(curves[size], 2)
@@ -155,7 +155,7 @@ def get_binary(filepath: str):
 
 
 if __name__ == "__main__":
-    # img = random_color_img(512, 128)
+    # img, data = random_color_img(512, 128)
     # # cv.imwrite("random_color_square_img.png", img)
     # cv.imshow("image", img)
     # cv.waitKey(0)
@@ -163,8 +163,8 @@ if __name__ == "__main__":
     # img_to_binary(img, "binary.bin", 128)
     data = get_binary(".cph/main.bin")
     img = binary_to_img(data, 256)
-    cv.imwrite("reconstructed.png", img)
+    cv.imwrite(".cph/reconstructed.png", img)
     cv.imshow("image", img)
     cv.waitKey(0)
-    img = cv.imread("reconstructed.png")
-    img_to_binary(img, "binaryreq.bin", 256, data)  # type: ignore
+    img = cv.imread(".cph/reconstructed.png")
+    img_to_binary(img, ".cph/main_req.bin", 256, data)  # type: ignore
