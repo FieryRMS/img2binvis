@@ -101,11 +101,14 @@ def get_size(filesize: int):
 def img_to_binary(
     img: npt.NDArray[np.uint8],
     filename: str,
-    ori_data: npt.NDArray[np.uint8],
+    data: npt.NDArray[np.uint8],
+    offset_start: int = 0,
+    offset_end: int = math.inf,  # pyright: ignore[reportArgumentType]
 ):
     # make a new image with the same size as the original image
     img2 = np.zeros_like(img)
-    filesize = ori_data.shape[0]
+    offset_end = min(offset_end, data.shape[0])
+    filesize = offset_end - offset_start
     size = get_size(filesize)
     ratio = size * size * 4 / filesize
 
@@ -119,29 +122,37 @@ def img_to_binary(
 
     previdx = 0
     with open(filename, "wb") as f:
+        while previdx < offset_start:
+            f.write(int(data[previdx]).to_bytes(1, "big"))
+            previdx += 1
         for i in range(size * 4):
             for j in range(size):
                 for k in range(len(colors)):
                     if (img2[i, j] == colors[k]).all():
                         dis = i * size + j
-                        idx = math.floor(dis / ratio)
+                        idx = math.floor(dis / ratio) + offset_start
                         while previdx < idx:
-                            f.write(int(ori_data[previdx]).to_bytes(1, "big"))
+                            f.write(int(data[previdx]).to_bytes(1, "big"))
                             previdx += 1
-                        if colors[k] != bin2color(int(ori_data[idx])):
+                        if colors[k] != bin2color(int(data[idx])):
                             f.write(color_codes[k]().to_bytes(1, "big"))
                         else:
-                            f.write(int(ori_data[idx]).to_bytes(1, "big"))
+                            f.write(int(data[idx]).to_bytes(1, "big"))
                         previdx = idx + 1
                         break
 
-        while previdx < filesize:
-            f.write(int(ori_data[previdx]).to_bytes(1, "big"))
+        while previdx < data.shape[0]:
+            f.write(int(data[previdx]).to_bytes(1, "big"))
             previdx += 1
 
 
-def binary_to_img(data: npt.NDArray[np.uint8]):
-    filesize = data.shape[0]
+def binary_to_img(
+    data: npt.NDArray[np.uint8],
+    offset_start: int = 0,
+    offset_end: int = math.inf,  # pyright: ignore[reportArgumentType]
+):
+    offset_end = min(offset_end, data.shape[0])
+    filesize = offset_end - offset_start
     size = get_size(filesize)
     hilbert_curve = HilbertCurve(curves[size], 2)
     ratio = size * size * 4 / filesize
@@ -150,7 +161,7 @@ def binary_to_img(data: npt.NDArray[np.uint8]):
         for j in range(size):
             dis = point2dis(hilbert_curve, i, j)
             idx = math.floor(dis / ratio)
-            img[i, j] = bin2color(int(data[idx]))
+            img[i, j] = bin2color(int(data[offset_start + idx]))
     return img
 
 
@@ -173,9 +184,11 @@ if __name__ == "__main__":
     # img = cv.imread("random_color_square_img.png")
     # img_to_binary(img, "binary.bin", 128)
     data = get_binary(".cph/main.bin")
-    img = binary_to_img(data)
+    offset_start = 0
+    offset_end = data.shape[0]
+    img = binary_to_img(data, offset_start, offset_end)
     cv.imwrite(".cph/reconstructed.png", img)
     cv.imshow("image", img)
     cv.waitKey(0)
     img = cv.imread(".cph/reconstructed.png").astype(np.uint8)
-    img_to_binary(img, ".cph/main_req.bin", data)  
+    img_to_binary(img, ".cph/main_req.bin", data, offset_start, offset_end)
