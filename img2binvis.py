@@ -87,14 +87,27 @@ def point2dis(hilbert_curve: HilbertCurve, x: int, y: int):
     return dis
 
 
+def get_size(filesize: int):
+    size = 0
+    for i in sorted(curves.keys(), reverse=True):
+        if i * i * 4 <= filesize:
+            size = i
+            break
+    if size == 0:
+        raise ValueError("Invalid filesize")
+    return size
+
+
 def img_to_binary(
     img: npt.NDArray[np.uint8],
     filename: str,
-    size: int,
     ori_data: npt.NDArray[np.uint8],
 ):
     # make a new image with the same size as the original image
     img2 = np.zeros_like(img)
+    filesize = ori_data.shape[0]
+    size = get_size(filesize)
+    ratio = size * size * 4 / filesize
 
     # use the hilbert curve to traverse the original image
     hilbert_curve = HilbertCurve(curves[size], 2)
@@ -103,9 +116,6 @@ def img_to_binary(
         for j in range(size):
             x, y = dis2point(hilbert_curve, i * size + j)
             img2[i, j] = img[x, y]
-
-    filesize = ori_data.shape[0]
-    ratio = size * size * 4 / filesize
 
     previdx = 0
     with open(filename, "wb") as f:
@@ -130,9 +140,10 @@ def img_to_binary(
             previdx += 1
 
 
-def binary_to_img(data: npt.NDArray[np.uint8], size: int):
-    hilbert_curve = HilbertCurve(curves[size], 2)
+def binary_to_img(data: npt.NDArray[np.uint8]):
     filesize = data.shape[0]
+    size = get_size(filesize)
+    hilbert_curve = HilbertCurve(curves[size], 2)
     ratio = size * size * 4 / filesize
     img = np.zeros((size * 4, size, 3), np.uint8)
     for i in range(size * 4):
@@ -162,9 +173,9 @@ if __name__ == "__main__":
     # img = cv.imread("random_color_square_img.png")
     # img_to_binary(img, "binary.bin", 128)
     data = get_binary(".cph/main.bin")
-    img = binary_to_img(data, 256)
+    img = binary_to_img(data)
     cv.imwrite(".cph/reconstructed.png", img)
     cv.imshow("image", img)
     cv.waitKey(0)
-    img = cv.imread(".cph/reconstructed.png")
-    img_to_binary(img, ".cph/main_req.bin", 256, data)  # type: ignore
+    img = cv.imread(".cph/reconstructed.png").astype(np.uint8)
+    img_to_binary(img, ".cph/main_req.bin", data)  
