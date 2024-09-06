@@ -64,11 +64,14 @@ def random_color_img(x: int, y: int = -1):
     if y == -1:
         y = x
     img = np.zeros((x, y, 3), np.uint8)
+    data = np.zeros((x * y), np.uint8)
     for i in range(x):
         for j in range(y):
-            color = random.choice(colors)
-            img[i, j] = color
-    return img
+            color = random.randint(0, 4)
+            img[i, j] = colors[color]
+            data[i * x + j] = color_codes[color]()
+
+    return img, data
 
 
 def dis2point(hilbert_curve: HilbertCurve, dis: int):
@@ -88,7 +91,7 @@ def img_to_binary(
     img: npt.NDArray[np.uint8],
     filename: str,
     size: int,
-    ori_data: npt.NDArray[np.uint8] | None = None,
+    ori_data: npt.NDArray[np.uint8],
 ):
     # make a new image with the same size as the original image
     img2 = np.zeros_like(img)  # type: ignore
@@ -96,35 +99,35 @@ def img_to_binary(
     # use the hilbert curve to traverse the original image
     hilbert_curve = HilbertCurve(curves[size], 2)
 
-    for i in range(img2.shape[0]):
-        for j in range(img2.shape[1]):
+    for i in range(size * 4):
+        for j in range(size):
             x, y = dis2point(hilbert_curve, i * size + j)
             img2[i, j] = img[x, y]
 
-    if ori_data is not None:
-        filesize = ori_data.shape[0]
-        ratio = size * size * 4 / filesize
-    else:
-        filesize = None
-        ratio = None
+    filesize = ori_data.shape[0]
+    ratio = size * size * 4 / filesize
 
+    previdx = 0
     with open(filename, "wb") as f:
-        for i in range(img2.shape[0]):
-            for j in range(img2.shape[1]):
+        for i in range(size * 4):
+            for j in range(size):
                 for k in range(len(colors)):
                     if (img2[i, j] == colors[k]).all():
-                        if ori_data is None:
+                        dis = i * size + j
+                        idx = math.floor(dis / ratio)
+                        while previdx < idx:
+                            f.write(int(ori_data[previdx]).to_bytes(1, "big"))
+                            previdx += 1
+                        if colors[k] != bin2color(int(ori_data[idx])):
                             f.write(color_codes[k]().to_bytes(1, "big"))
                         else:
-                            dis = point2dis(hilbert_curve, i, j)
-                            idx = math.floor(dis / ratio)
-                            if idx == i * size + j or colors[k] != bin2color(
-                                int(ori_data[idx])
-                            ):
-                                f.write(color_codes[k]().to_bytes(1, "big"))
-                            else:
-                                f.write(int(ori_data[idx]).to_bytes(1, "big"))
+                            f.write(int(ori_data[idx]).to_bytes(1, "big"))
+                        previdx = idx + 1
                         break
+
+        while previdx < filesize:
+            f.write(int(ori_data[previdx]).to_bytes(1, "big"))
+            previdx += 1
 
 
 def binary_to_img(data: npt.NDArray[np.uint8], size: int):
