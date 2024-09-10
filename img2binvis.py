@@ -8,18 +8,18 @@ import numpy.typing as npt
 from hilbertcurve.hilbertcurve import HilbertCurve  # type: ignore
 
 
-def black():
+def black() -> int:
     return 0
 
 
-def green():
+def green() -> int:
     res = random.randint(1, 31)
     while res in [9, 10, 13]:
         res = random.randint(1, 31)
     return res
 
 
-def blue():
+def blue() -> int:
     res = random.randint(32 - 3, 126)
     if res < 32:
         res = 31 - res
@@ -27,11 +27,11 @@ def blue():
     return res
 
 
-def red():
+def red() -> int:
     return random.randint(127, 254)
 
 
-def white():
+def white() -> int:
     return 255
 
 
@@ -40,6 +40,10 @@ color_codes = [black, green, blue, red, white]
 
 colors = [(0, 0, 0), (77, 175, 74), (16, 114, 184), (228, 26, 28), (255, 255, 255)]
 curves = {2: 1, 4: 2, 8: 3, 16: 4, 32: 5, 64: 6, 128: 7, 256: 8}
+
+# convert RGB to BGR
+for i in range(len(colors)):
+    colors[i] = (colors[i][2], colors[i][1], colors[i][0])
 
 
 def bin2color(bin: int):
@@ -56,22 +60,21 @@ def bin2color(bin: int):
     return colors[4]
 
 
-for i in range(len(colors)):
-    colors[i] = (colors[i][2], colors[i][1], colors[i][0])
+def color2idx(color: npt.NDArray[np.uint8]):
+    for i in range(len(colors)):
+        if (color == colors[i]).all():
+            return i
+    return -1
 
 
-def random_color_img(x: int, y: int = -1):
+def random_data(x: int, y: int = -1):
     if y == -1:
-        y = x
-    img = np.zeros((x, y, 3), np.uint8)
+        y = x * 4
     data = np.zeros((x * y), np.uint8)
-    for i in range(x):
-        for j in range(y):
-            color = random.randint(0, 4)
-            img[i, j] = colors[color]
-            data[i * x + j] = color_codes[color]()
-
-    return img, data
+    for i in range(x * y):
+        color = random.randint(0, 4)
+        data[i] = color_codes[color]()
+    return data
 
 
 def dis2point(hilbert_curve: HilbertCurve, dis: int):
@@ -88,6 +91,7 @@ def point2dis(hilbert_curve: HilbertCurve, x: int, y: int):
 
 
 def get_size(filesize: int):
+    return 256
     size = 0
     for i in sorted(curves.keys(), reverse=True):
         if i * i * 4 <= filesize:
@@ -106,7 +110,6 @@ def img_to_binary(
     offset_end: int = math.inf,  # pyright: ignore[reportArgumentType]
 ):
     # make a new image with the same size as the original image
-    img2 = np.zeros_like(img)
     offset_end = min(offset_end, data.shape[0])
     filesize = offset_end - offset_start
     size = get_size(filesize)
@@ -117,33 +120,13 @@ def img_to_binary(
 
     for i in range(size * 4):
         for j in range(size):
-            x, y = dis2point(hilbert_curve, i * size + j)
-            img2[i, j] = img[x, y]
+            dis = point2dis(hilbert_curve, i, j)
+            idx = math.floor(dis / ratio) + offset_start
+            if (bin2color(int(data[idx])) != img[i, j]).all():
+                data[idx] = color_codes[color2idx(img[i, j])]()
 
-    previdx = 0
     with open(filename, "wb") as f:
-        while previdx < offset_start:
-            f.write(int(data[previdx]).to_bytes(1, "big"))
-            previdx += 1
-        for i in range(size * 4):
-            for j in range(size):
-                for k in range(len(colors)):
-                    if (img2[i, j] == colors[k]).all():
-                        dis = i * size + j
-                        idx = math.floor(dis / ratio) + offset_start
-                        while previdx < idx:
-                            f.write(int(data[previdx]).to_bytes(1, "big"))
-                            previdx += 1
-                        if colors[k] != bin2color(int(data[idx])):
-                            f.write(color_codes[k]().to_bytes(1, "big"))
-                        else:
-                            f.write(int(data[idx]).to_bytes(1, "big"))
-                        previdx = idx + 1
-                        break
-
-        while previdx < data.shape[0]:
-            f.write(int(data[previdx]).to_bytes(1, "big"))
-            previdx += 1
+        f.write(data)
 
 
 def binary_to_img(
@@ -177,18 +160,17 @@ def get_binary(filepath: str):
 
 
 if __name__ == "__main__":
-    # img, data = random_color_img(512, 128)
-    # # cv.imwrite("random_color_square_img.png", img)
-    # cv.imshow("image", img)
-    # cv.waitKey(0)
-    # img = cv.imread("random_color_square_img.png")
-    # img_to_binary(img, "binary.bin", 128)
-    data = get_binary(".cph/main.bin")
-    offset_start = 0
-    offset_end = data.shape[0]
+    data = get_binary("temp/sample.jpg")  # get binary data from file
+    offset_start = 36928
+    offset_end = 82457
     img = binary_to_img(data, offset_start, offset_end)
-    cv.imwrite(".cph/reconstructed.png", img)
+
+    # save then show the image
+    cv.imwrite("temp/reconstructed.png", img)
     cv.imshow("image", img)
+
+    # you can now edit the image file, and then close the opencv window to use the edited file
     cv.waitKey(0)
-    img = cv.imread(".cph/reconstructed.png").astype(np.uint8)
-    img_to_binary(img, ".cph/main_req.bin", data, offset_start, offset_end)
+
+    img = cv.imread("temp/reconstructed.png").astype(np.uint8)
+    img_to_binary(img, "temp/processed.jpg", data, offset_start, offset_end)
