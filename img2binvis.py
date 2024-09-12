@@ -7,73 +7,90 @@ import numpy as np
 import numpy.typing as npt
 from hilbertcurve.hilbertcurve import HilbertCurve  # type: ignore
 
-
-def black() -> int:
-    return 0
-
-
-def green() -> int:
-    res = random.randint(1, 31)
-    while res in [9, 10, 13]:
-        res = random.randint(1, 31)
-    return res
-
-
-def blue() -> int:
-    res = random.randint(32 - 3, 126)
-    if res < 32:
-        res = 31 - res
-        return [9, 10, 13][res]
-    return res
-
-
-def red() -> int:
-    return random.randint(127, 254)
-
-
-def white() -> int:
-    return 255
-
-
-color_codes = [black, green, blue, red, white]
-
-
-colors = [(0, 0, 0), (77, 175, 74), (16, 114, 184), (228, 26, 28), (255, 255, 255)]
 curves = {2: 1, 4: 2, 8: 3, 16: 4, 32: 5, 64: 6, 128: 7, 256: 8}
 
-# convert RGB to BGR
-for i in range(len(colors)):
-    colors[i] = (colors[i][2], colors[i][1], colors[i][0])
+
+def HEX2BGR(lst: list[str]):
+    res: list[tuple[int, int, int]] = []
+    for i in lst:
+        hx = i.lstrip("#")
+        res.append((int(hx[4:6], 16), int(hx[2:4], 16), int(hx[0:2], 16)))
+    return res
 
 
-def bin2color(bin: int):
-    if bin == 0:
-        return colors[0]
-    if bin in [9, 10, 13]:
-        return colors[2]
-    if bin >= 1 and bin <= 31:
-        return colors[1]
-    if bin >= 32 and bin <= 126:
-        return colors[2]
-    if bin >= 127 and bin <= 254:
-        return colors[3]
-    return colors[4]
+class ColorScheme:
+    @staticmethod
+    def byte2color(byte: int) -> tuple[int, int, int]:
+        return (0, 0, 0)
+
+    @staticmethod
+    def idx2byte(idx: int) -> int:
+        return 0
+
+    @staticmethod
+    def color2idx(color: npt.NDArray[np.uint8]) -> int:
+        return 0
+
+    @staticmethod
+    def randColor() -> tuple[int, int, int]:
+        return (0, 0, 0)
 
 
-def color2idx(color: npt.NDArray[np.uint8]):
-    for i in range(len(colors)):
-        if (color == colors[i]).all():
-            return i
-    return -1
+class ByteClass(ColorScheme):
+    colors = HEX2BGR(["#000000", "#4daf4a", "#1072b8", "#e41a1c", "#ffffff"])
+
+    @staticmethod
+    def byte2color(byte: int):
+        if byte == 0:
+            return ByteClass.colors[0]
+        if byte in [9, 10, 13]:
+            return ByteClass.colors[2]
+        if byte >= 1 and byte <= 31:
+            return ByteClass.colors[1]
+        if byte >= 32 and byte <= 126:
+            return ByteClass.colors[2]
+        if byte >= 127 and byte <= 254:
+            return ByteClass.colors[3]
+        return ByteClass.colors[4]
+
+    @staticmethod
+    def idx2byte(idx: int):
+        if idx == 0:
+            return 0
+        elif idx == 1:
+            res = random.randint(1, 31)
+            while res in [9, 10, 13]:
+                res = random.randint(1, 31)
+            return res
+        elif idx == 2:
+            res = random.randint(32 - 3, 126)
+            if res < 32:
+                res = 31 - res
+                return [9, 10, 13][res]
+            return res
+        elif idx == 3:
+            return random.randint(127, 254)
+        else:
+            return 255
+
+    @staticmethod
+    def color2idx(color: npt.NDArray[np.uint8]):
+        for i in range(len(ByteClass.colors)):
+            if (color == ByteClass.colors[i]).all():
+                return i
+        return -1
+
+    @staticmethod
+    def randColor():
+        return ByteClass.colors[random.randint(0, 4)]
 
 
-def random_data(x: int, y: int = -1):
+def random_data(x: int, y: int = -1, clrschm: type[ColorScheme] = ByteClass):
     if y == -1:
         y = x * 4
     data = np.zeros((x * y), np.uint8)
     for i in range(x * y):
-        color = random.randint(0, 4)
-        data[i] = color_codes[color]()
+        data[i] = clrschm.randColor()
     return data
 
 
@@ -108,6 +125,7 @@ def img_to_binary(
     data: npt.NDArray[np.uint8],
     offset_start: int = 0,
     offset_end: int = math.inf,  # pyright: ignore[reportArgumentType]
+    clrschm: type[ColorScheme] = ByteClass,
 ):
     # make a new image with the same size as the original image
     offset_end = min(offset_end, data.shape[0])
@@ -122,8 +140,8 @@ def img_to_binary(
         for j in range(size):
             dis = point2dis(hilbert_curve, i, j)
             idx = math.floor(dis / ratio) + offset_start
-            if (bin2color(int(data[idx])) != img[i, j]).all():
-                data[idx] = color_codes[color2idx(img[i, j])]()
+            if (clrschm.byte2color(int(data[idx])) != img[i, j]).all():
+                data[idx] = clrschm.idx2byte(clrschm.color2idx(img[i, j]))
 
     with open(filename, "wb") as f:
         f.write(data)
@@ -133,6 +151,7 @@ def binary_to_img(
     data: npt.NDArray[np.uint8],
     offset_start: int = 0,
     offset_end: int = math.inf,  # pyright: ignore[reportArgumentType]
+    clrschm: type[ColorScheme] = ByteClass,
 ):
     offset_end = min(offset_end, data.shape[0])
     filesize = offset_end - offset_start
@@ -144,7 +163,7 @@ def binary_to_img(
         for j in range(size):
             dis = point2dis(hilbert_curve, i, j)
             idx = math.floor(dis / ratio)
-            img[i, j] = bin2color(int(data[offset_start + idx]))
+            img[i, j] = clrschm.byte2color(int(data[offset_start + idx]))
     return img
 
 
@@ -161,8 +180,8 @@ def get_binary(filepath: str):
 
 if __name__ == "__main__":
     data = get_binary("temp/sample.jpg")  # get binary data from file
-    offset_start = 36928
-    offset_end = 82457
+    offset_start = 0
+    offset_end = data.shape[0]
     img = binary_to_img(data, offset_start, offset_end)
 
     # save then show the image
