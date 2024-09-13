@@ -66,7 +66,7 @@ def img_to_binary(
         for j in range(size):
             dis = point2dis(hilbert_curve, i, j)
             idx = math.floor(dis / ratio) + offset_start
-            if (clrschm.byte2color(int(data[idx])) != img[i, j]).all():
+            if clrschm.byte2color(int(data[idx])) != tuple(img[i, j]):
                 data[idx] = clrschm.color2byte(tuple(img[i, j]))
 
     with open(filename, "wb") as f:
