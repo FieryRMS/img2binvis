@@ -47,7 +47,6 @@ def get_size(filesize: int):
 
 def img_to_binary(
     img: npt.NDArray[np.uint8],
-    filename: str,
     data: npt.NDArray[np.uint8],
     offset_start: int = 0,
     offset_end: int = math.inf,  # pyright: ignore[reportArgumentType]
@@ -73,8 +72,7 @@ def img_to_binary(
                     raise ValueError(f"Color not found: {j}, {i}, {img[i, j]}")
                 data[idx] = ret
 
-    with open(filename, "wb") as f:
-        f.write(data)
+    return data
 
 
 def binary_to_img(
@@ -124,7 +122,11 @@ def main(file_in: str):
     cv.waitKey(0)
 
     img = cv.imread("temp/reconstructed.png").astype(np.uint8)
-    img_to_binary(img, fileout, data, offset_start, offset_end, clrschm, False)
+    new_data = img_to_binary(img, data, offset_start, offset_end, clrschm, False)
+
+    with open(fileout, "wb") as f:
+        f.write(new_data)
+
 
 
 if __name__ == "__main__":

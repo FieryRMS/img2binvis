@@ -57,6 +57,7 @@ class ColorScheme:
                 if diff < mindiff:
                     mindiff = diff
                     minclr = c
+
             if byte == -1:
                 return random.choice(cls.colormap[minclr])
 
@@ -79,8 +80,8 @@ class ColorScheme:
 
     @staticmethod
     def colordiff(c1: Color, c2: Color) -> float:
-        rgb1 = sRGBColor(c1[2], c1[1], c1[0])
-        rgb2 = sRGBColor(c2[2], c2[1], c2[0])
+        rgb1 = sRGBColor(c1[2], c1[1], c1[0], is_upscaled=True)
+        rgb2 = sRGBColor(c2[2], c2[1], c2[0], is_upscaled=True)
         lab1: LabColor = convert_color(rgb1, LabColor)  # type: ignore
         lab2: LabColor = convert_color(rgb2, LabColor)  # type: ignore
         return delta_e_cie2000(lab1, lab2)  # type: ignore
