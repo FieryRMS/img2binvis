@@ -1,88 +1,14 @@
 import math
 import os
-import random
 
 import cv2 as cv
 import numpy as np
 import numpy.typing as npt
 from hilbertcurve.hilbertcurve import HilbertCurve  # type: ignore
 
+from colorschemes import ByteClass, ColorScheme
+
 curves = {2: 1, 4: 2, 8: 3, 16: 4, 32: 5, 64: 6, 128: 7, 256: 8}
-
-
-def HEX2BGR(lst: list[str]):
-    res: list[tuple[int, int, int]] = []
-    for i in lst:
-        hx = i.lstrip("#")
-        res.append((int(hx[4:6], 16), int(hx[2:4], 16), int(hx[0:2], 16)))
-    return res
-
-
-class ColorScheme:
-    @staticmethod
-    def byte2color(byte: int) -> tuple[int, int, int]:
-        return (0, 0, 0)
-
-    @staticmethod
-    def idx2byte(idx: int) -> int:
-        return 0
-
-    @staticmethod
-    def color2idx(color: npt.NDArray[np.uint8]) -> int:
-        return 0
-
-    @staticmethod
-    def randColor() -> tuple[int, int, int]:
-        return (0, 0, 0)
-
-
-class ByteClass(ColorScheme):
-    colors = HEX2BGR(["#000000", "#4daf4a", "#1072b8", "#e41a1c", "#ffffff"])
-
-    @staticmethod
-    def byte2color(byte: int):
-        if byte == 0:
-            return ByteClass.colors[0]
-        if byte in [9, 10, 13]:
-            return ByteClass.colors[2]
-        if byte >= 1 and byte <= 31:
-            return ByteClass.colors[1]
-        if byte >= 32 and byte <= 126:
-            return ByteClass.colors[2]
-        if byte >= 127 and byte <= 254:
-            return ByteClass.colors[3]
-        return ByteClass.colors[4]
-
-    @staticmethod
-    def idx2byte(idx: int):
-        if idx == 0:
-            return 0
-        elif idx == 1:
-            res = random.randint(1, 31)
-            while res in [9, 10, 13]:
-                res = random.randint(1, 31)
-            return res
-        elif idx == 2:
-            res = random.randint(32 - 3, 126)
-            if res < 32:
-                res = 31 - res
-                return [9, 10, 13][res]
-            return res
-        elif idx == 3:
-            return random.randint(127, 254)
-        else:
-            return 255
-
-    @staticmethod
-    def color2idx(color: npt.NDArray[np.uint8]):
-        for i in range(len(ByteClass.colors)):
-            if (color == ByteClass.colors[i]).all():
-                return i
-        return -1
-
-    @staticmethod
-    def randColor():
-        return ByteClass.colors[random.randint(0, 4)]
 
 
 def random_data(x: int, y: int = -1, clrschm: type[ColorScheme] = ByteClass):
@@ -141,7 +67,7 @@ def img_to_binary(
             dis = point2dis(hilbert_curve, i, j)
             idx = math.floor(dis / ratio) + offset_start
             if (clrschm.byte2color(int(data[idx])) != img[i, j]).all():
-                data[idx] = clrschm.idx2byte(clrschm.color2idx(img[i, j]))
+                data[idx] = clrschm.color2byte(tuple(img[i, j]))
 
     with open(filename, "wb") as f:
         f.write(data)
@@ -179,10 +105,11 @@ def get_binary(filepath: str):
 
 
 if __name__ == "__main__":
+    clrschm: type[ColorScheme] = ByteClass
     data = get_binary("temp/sample.jpg")  # get binary data from file
     offset_start = 0
     offset_end = data.shape[0]
-    img = binary_to_img(data, offset_start, offset_end)
+    img = binary_to_img(data, offset_start, offset_end, clrschm)
 
     # save then show the image
     cv.imwrite("temp/reconstructed.png", img)
@@ -192,4 +119,4 @@ if __name__ == "__main__":
     cv.waitKey(0)
 
     img = cv.imread("temp/reconstructed.png").astype(np.uint8)
-    img_to_binary(img, "temp/processed.jpg", data, offset_start, offset_end)
+    img_to_binary(img, "temp/processed.jpg", data, offset_start, offset_end, clrschm)
