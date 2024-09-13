@@ -6,7 +6,7 @@ import numpy as np
 import numpy.typing as npt
 from hilbertcurve.hilbertcurve import HilbertCurve  # type: ignore
 
-from colorschemes import ByteClass, ColorScheme
+from colorschemes import ByteClass, ByteDetail, ColorScheme
 
 curves = {2: 1, 4: 2, 8: 3, 16: 4, 32: 5, 64: 6, 128: 7, 256: 8}
 
@@ -52,6 +52,7 @@ def img_to_binary(
     offset_start: int = 0,
     offset_end: int = math.inf,  # pyright: ignore[reportArgumentType]
     clrschm: type[ColorScheme] = ByteClass,
+    cloest_color: bool = False,  # this is very slow if set to True
 ):
     # make a new image with the same size as the original image
     offset_end = min(offset_end, data.shape[0])
@@ -67,7 +68,10 @@ def img_to_binary(
             dis = point2dis(hilbert_curve, i, j)
             idx = math.floor(dis / ratio) + offset_start
             if clrschm.byte2color(int(data[idx])) != tuple(img[i, j]):
-                data[idx] = clrschm.color2byte(tuple(img[i, j]))
+                ret = clrschm.color2byte(tuple(img[i, j]), cloest_color)
+                if ret == -1:
+                    raise ValueError(f"Color not found: {j}, {i}, {img[i, j]}")
+                data[idx] = ret
 
     with open(filename, "wb") as f:
         f.write(data)
@@ -88,8 +92,8 @@ def binary_to_img(
     for i in range(size * 4):
         for j in range(size):
             dis = point2dis(hilbert_curve, i, j)
-            idx = math.floor(dis / ratio)
-            img[i, j] = clrschm.byte2color(int(data[offset_start + idx]))
+            idx = math.floor(dis / ratio) + offset_start
+            img[i, j] = clrschm.byte2color(int(data[idx]))
     return img
 
 
@@ -104,9 +108,10 @@ def get_binary(filepath: str):
     return data
 
 
-if __name__ == "__main__":
-    clrschm: type[ColorScheme] = ByteClass
-    data = get_binary("temp/sample.jpg")  # get binary data from file
+def main(file_in: str):
+    clrschm: type[ColorScheme] = ByteDetail
+    fileout = "temp/processed" + file_in[file_in.rfind(".") :]
+    data = get_binary(file_in)  # get binary data from file
     offset_start = 0
     offset_end = data.shape[0]
     img = binary_to_img(data, offset_start, offset_end, clrschm)
@@ -119,4 +124,8 @@ if __name__ == "__main__":
     cv.waitKey(0)
 
     img = cv.imread("temp/reconstructed.png").astype(np.uint8)
-    img_to_binary(img, "temp/processed.jpg", data, offset_start, offset_end, clrschm)
+    img_to_binary(img, fileout, data, offset_start, offset_end, clrschm, False)
+
+
+if __name__ == "__main__":
+    main("temp/image2.bmp")

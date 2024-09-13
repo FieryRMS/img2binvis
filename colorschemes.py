@@ -1,7 +1,23 @@
+import math
 import random
 from typing import Tuple
 
+from colormath.color_conversions import convert_color  # type: ignore
+from colormath.color_diff import delta_e_cie2000  # type: ignore
+from colormath.color_objects import LabColor, sRGBColor  # type: ignore
+
 type Color = Tuple[int, int, int]
+
+
+import numpy
+
+
+def patch_asscalar(a):  # type: ignore
+    return a.item()  # type: ignore
+
+
+# patch numpy.asscalar
+setattr(numpy, "asscalar", patch_asscalar)
 
 
 def HEX2BGR(lst: list[str]):
@@ -32,14 +48,42 @@ class ColorScheme:
         return cls.colors[byte]
 
     @classmethod
-    def color2byte(cls, color: Color) -> int:
+    def color2byte(cls, color: Color, closest: bool = False, byte: int = -1) -> int:
+        if closest:
+            mindiff = math.inf
+            minclr = (0, 0, 0)
+            for c in cls.colormap.keys():
+                diff = cls.colordiff(c, color)
+                if diff < mindiff:
+                    mindiff = diff
+                    minclr = c
+            if byte == -1:
+                return random.choice(cls.colormap[minclr])
+
+            mindiff = math.inf
+            minbyte = -1
+            for b in cls.colormap[minclr]:
+                diff = abs(b - byte)
+                if diff < mindiff:
+                    mindiff = diff
+                    minbyte = b
+            return minbyte
+
         if color not in cls.colormap:
-            raise ValueError("Color not in colormap")
+            return -1
         return random.choice(cls.colormap[color])
 
     @classmethod
     def randColor(cls) -> Color:
         return random.choice(list(cls.colormap.keys()))
+
+    @staticmethod
+    def colordiff(c1: Color, c2: Color) -> float:
+        rgb1 = sRGBColor(c1[2], c1[1], c1[0])
+        rgb2 = sRGBColor(c2[2], c2[1], c2[0])
+        lab1: LabColor = convert_color(rgb1, LabColor)  # type: ignore
+        lab2: LabColor = convert_color(rgb2, LabColor)  # type: ignore
+        return delta_e_cie2000(lab1, lab2)  # type: ignore
 
 
 class ByteClass(ColorScheme):

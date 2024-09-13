@@ -1,0 +1,4 @@
+colormath==3.0.0
+hilbertcurve==2.0.5
+numpy==2.1.1
+opencv_python==4.10.0.84
