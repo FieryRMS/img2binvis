@@ -20,11 +20,11 @@ def patch_asscalar(a):  # type: ignore
 setattr(numpy, "asscalar", patch_asscalar)
 
 
-def HEX2BGR(lst: list[str]):
+def HEX2RGB(lst: list[str]):
     res: list[Color] = []
     for i in lst:
         hx = i.lstrip("#")
-        res.append((int(hx[4:6], 16), int(hx[2:4], 16), int(hx[0:2], 16)))
+        res.append((int(hx[0:2], 16), int(hx[2:4], 16), int(hx[4:6], 16)))
     return res
 
 
@@ -88,7 +88,7 @@ class ColorScheme:
 
 
 class ByteClass(ColorScheme):
-    colors = HEX2BGR(
+    colors = HEX2RGB(
         [
             (
                 "#000000"
@@ -112,7 +112,7 @@ class ByteClass(ColorScheme):
 
 class ByteMagnitude(ColorScheme):
     # fmt: off
-    colors = HEX2BGR(
+    colors = HEX2RGB(
         [
             "#000000","#020101","#050103","#070204","#0a0306","#0c0407","#0e0409","#10050a",
             "#12060c","#13070d","#15070e","#16080f","#170910","#180a11","#1a0b12","#1b0b13",
@@ -154,7 +154,7 @@ class ByteMagnitude(ColorScheme):
 
 class ByteDetail(ColorScheme):
     # fmt: off
-    colors = HEX2BGR(
+    colors = HEX2RGB(
         [
             "#000000","#002020","#203f1f","#3f1f20","#400000","#602000","#7f1f20","#5f203f",
             "#400040","#602040","#7f1f60","#5f207f","#3f007f","#1f005f","#202040","#1f3f60",

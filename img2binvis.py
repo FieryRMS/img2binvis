@@ -1,10 +1,10 @@
 import math
 import os
 
-import cv2 as cv
 import numpy as np
 import numpy.typing as npt
 from hilbertcurve.hilbertcurve import HilbertCurve  # type: ignore
+from PIL import Image
 
 from colorschemes import ByteClass, ByteDetail, ColorScheme
 
@@ -115,18 +115,15 @@ def main(file_in: str):
     img = binary_to_img(data, offset_start, offset_end, clrschm)
 
     # save then show the image
-    cv.imwrite("temp/reconstructed.png", img)
-    cv.imshow("image", img)
+    Image.fromarray(img).save("temp/reconstructed.png")
 
-    # you can now edit the image file, and then close the opencv window to use the edited file
-    cv.waitKey(0)
+    input("Edit the image then press enter to continue...")
 
-    img = cv.imread("temp/reconstructed.png").astype(np.uint8)
+    img = np.array(Image.open("temp/reconstructed.png").convert("RGB"))
     new_data = img_to_binary(img, data, offset_start, offset_end, clrschm, False)
 
     with open(fileout, "wb") as f:
         f.write(new_data)
-
 
 
 if __name__ == "__main__":
