@@ -1,5 +1,4 @@
 import math
-import os
 
 import numpy as np
 import numpy.typing as npt
@@ -96,14 +95,7 @@ def binary_to_img(
 
 
 def get_binary(filepath: str):
-    filesize = os.path.getsize(filepath)
-    data = np.zeros((filesize), np.uint8)
-    with open(filepath, "rb") as f:
-        distance = 0
-        while byte := f.read(1):
-            data[distance] = int.from_bytes(byte, "big")
-            distance += 1
-    return data
+    return np.fromfile(filepath, np.uint8)
 
 
 def main(file_in: str):
